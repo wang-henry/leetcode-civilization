@@ -11,7 +11,7 @@ async def init():
 
 async def link_id(discord_id: int, leetcode_handle: str, lc_info: dict):
     await db.execute(
-        "INSERT INTO users (discord_id, leetcode_handle, rank, tickets, easies, mediums, hards)"
+        "INSERT INTO users (discord_id, leetcode_handle, rank, tickets, easies, mediums, hards, champion_lp)"
         + " VALUES (?, ?, 'Noob', 0, ?, ?, ?, 0) ON CONFLICT (discord_id) DO UPDATE"
         + " SET leetcode_handle = ?, rank = 'Noob', tickets = 0, easies = 0, mediums = 0, hards = 0, champion_lp = 0 WHERE discord_id = excluded.discord_id",
         (
