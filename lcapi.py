@@ -78,7 +78,11 @@ async def get_recent_ac(handle: str):
     return result.get("recentAcSubmissionList", {})
 
 
-async def get_random_problem(difficulty: str = "MEDIUM"):
+async def get_random_problem(difficulty: str = "MEDIUM", retry: int = 0):
+    
+    if retry > 3:
+        return None
+    
     query = gql(
         """
     query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
@@ -94,6 +98,7 @@ async def get_random_problem(difficulty: str = "MEDIUM"):
       difficulty
       title
       titleSlug
+      paidOnly: isPaidOnly
     }
   }
 }
@@ -105,7 +110,7 @@ async def get_random_problem(difficulty: str = "MEDIUM"):
             "categorySlug": "all-code-essentials",
             "skip": 0,
             "limit": 1,
-            "filters": {"difficulty": difficulty},
+            "filters": {"difficulty": difficulty, "premiumOnly": False},
         },
     )
     total_problems = result["problemsetQuestionList"]["total"]
@@ -113,9 +118,16 @@ async def get_random_problem(difficulty: str = "MEDIUM"):
         query,
         {
             "categorySlug": "all-code-essentials",
-            "skip": random.randint(0, total_problems - 1),
-            "limit": 1,
-            "filters": {"difficulty": difficulty},
+            "skip": random.randint(0, max(0, total_problems - 100)),
+            "limit": 100,
+            "filters": {"difficulty": difficulty, "premiumOnly": False},
         },
     )
-    return result.get("problemsetQuestionList", {}).get("questions", [None])[0]
+    questions = result["problemsetQuestionList"]["questions"]
+    free_questions = list(filter(lambda q: not q["paidOnly"], questions))
+
+    if not free_questions:
+        # retry up to 3 times
+        return await get_random_problem(difficulty=difficulty, retry=retry + 1)
+
+    return random.choice(free_questions)

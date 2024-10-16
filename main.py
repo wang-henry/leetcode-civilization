@@ -256,16 +256,22 @@ async def rankup(interaction: discord.Interaction):
             )
             return
 
+        if user_info["rank"] == "Champion":
+            difficulty = random.choice(["MEDIUM", "HARD"])
+
+        question_info = await lcapi.get_random_problem(difficulty=difficulty)
+
+        if not question_info:
+            await interaction.followup.send(
+                embed=create_embed("There was a problem getting a problem, try again!")
+            )
+            return
+
         await db.set_tickets(
             interaction.user.id,
             user_info["tickets"] - RANKUP_PROGRESSION[user_info["rank"]]["ticket_cost"],
         )
         difficulty = RANKUP_PROGRESSION[user_info["rank"]]["difficulty"]
-
-        if user_info["rank"] == "Champion":
-            difficulty = random.choice(["MEDIUM", "HARD"])
-
-        question_info = await lcapi.get_random_problem(difficulty=difficulty)
         rankup_cache[interaction.user.id] = question_info
         exp_time = int(time.time() + 60 * 20)
         await interaction.followup.send(
