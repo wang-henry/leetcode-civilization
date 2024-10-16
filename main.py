@@ -256,6 +256,7 @@ async def rankup(interaction: discord.Interaction):
             )
             return
 
+        difficulty = RANKUP_PROGRESSION[user_info["rank"]]["difficulty"]
         if user_info["rank"] == "Champion":
             difficulty = random.choice(["MEDIUM", "HARD"])
 
@@ -271,7 +272,6 @@ async def rankup(interaction: discord.Interaction):
             interaction.user.id,
             user_info["tickets"] - RANKUP_PROGRESSION[user_info["rank"]]["ticket_cost"],
         )
-        difficulty = RANKUP_PROGRESSION[user_info["rank"]]["difficulty"]
         rankup_cache[interaction.user.id] = question_info
         exp_time = int(time.time() + 60 * 20)
         await interaction.followup.send(
