@@ -14,41 +14,33 @@ class BattleCancelRequest(discord.ui.View):
         self.battle_cancel_cache = battle_cancel_cache
         super().__init__(timeout=60)
 
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.user.id != self.id_b:
+            return False
+        return True
+
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, _):
-        if interaction.user.id != self.id_b:
-            await interaction.response.send_message(
-                embed=create_embed(f"Only <@{self.id_b}> can use this button!"),
-                ephemeral=True,
-            )
-            return
 
         if self.id_a in self.battle_cache:
             del self.battle_cache[self.id_a]
-        
+
         if self.id_b in self.battle_cache:
             del self.battle_cache[self.id_b]
 
         if (self.id_a, self.id_b) in self.battle_cancel_cache:
             del self.battle_cancel_cache[(self.id_a, self.id_b)]
 
-
         await interaction.response.send_message(
             f"<@{self.id_a}> <@{self.id_b}>",
-            embed=create_embed("Leetcode battle cancelled!")
+            embed=create_embed("Leetcode battle cancelled!"),
         )
 
         self.stop()
 
     @discord.ui.button(label="Decline", style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, _):
-        if interaction.user.id != self.id_b:
-            await interaction.response.send_message(
-                embed=create_embed(f"Only <@{self.id_b}> can use this button!"),
-                ephemeral=True,
-            )
-            return
-        
+
         if (self.id_a, self.id_b) in self.battle_cancel_cache:
             del self.battle_cancel_cache[(self.id_a, self.id_b)]
 
@@ -81,15 +73,13 @@ class BattleRequest(discord.ui.View):
         self.difficulty = difficulty
         super().__init__(timeout=120)
 
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.user.id != self.id_b:
+            return False
+        return True
+
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, _):
-        if interaction.user.id != self.id_b:
-            await interaction.response.send_message(
-                embed=create_embed(f"Only <@{self.id_b}> can use this button!"),
-                ephemeral=True,
-            )
-            return
-
         if (self.id_a, self.id_b) in self.request_cache:
             del self.request_cache[(self.id_a, self.id_b)]
 
@@ -124,12 +114,6 @@ class BattleRequest(discord.ui.View):
 
     @discord.ui.button(label="Decline", style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, _):
-        if interaction.user.id != self.id_b:
-            await interaction.response.send_message(
-                embed=create_embed(f"Only <@{self.id_b}> can use this button!"),
-                ephemeral=True,
-            )
-            return
 
         await interaction.response.send_message(
             embed=create_embed(
