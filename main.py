@@ -1,8 +1,10 @@
 import asyncio
+import os
 import random
+from typing import Literal, Union
 from cachetools import TTLCache
 import discord
-from consts import RANKUP_PROGRESSION
+from consts import RANK_VALUE, RANKDOWN_PROGRESSION, RANKUP_PROGRESSION
 import db
 from discord import app_commands
 from discord.ext import commands
@@ -10,7 +12,14 @@ import lcapi
 from datetime import datetime, timezone
 import time
 
-from util import create_embed, create_profile_embed, user_command
+from util import (
+    create_embed,
+    create_profile_embed,
+    handle_battle_result,
+    has_active_battle_request,
+    user_command,
+)
+from views import BattleCancelRequest, BattleRequest
 
 intents = discord.Intents.default()
 bot = commands.Bot(
@@ -20,6 +29,9 @@ bot = commands.Bot(
 )
 link_cache = TTLCache(maxsize=1024, ttl=300)
 rankup_cache = TTLCache(maxsize=1024, ttl=60 * 20)
+battle_request_cache = TTLCache(maxsize=2048, ttl=120)
+battle_cache = TTLCache(maxsize=2048, ttl=60 * 40)
+battle_cancel_cache = TTLCache(maxsize=2048, ttl=60)
 
 
 @bot.tree.command(
@@ -283,14 +295,194 @@ async def rankup(interaction: discord.Interaction):
         )
 
 
+@bot.tree.command(
+    name="battle", description="Challenge another player to a Leetcode battle!"
+)
+@app_commands.describe(
+    user="The user to challenge to a Leetcode battle.",
+    difficulty="The difficulty of the battle problem.",
+)
+@user_command(fetch_lc=False)
+async def battle(
+    interaction: discord.Interaction,
+    user: discord.Member,
+    difficulty: Literal["easy", "medium", "hard"],
+):
+    target_user = user
+    user_info, _ = interaction.data["injected"]
+    if interaction.user.id == target_user.id:
+        await interaction.response.send_message(
+            embed="You can't battle yourself!", ephemeral=True
+        )
+        return
+
+    if has_active_battle_request(
+        battle_request_cache, interaction.user.id, target_user.id
+    ):
+        await interaction.response.send_message(
+            embed="There is still an active battle request with this user!",
+            ephemeral=True,
+        )
+        return
+
+    if interaction.user.id in battle_cache:
+        opponent_id, problem_slug, _, _ = battle_cache[interaction.user.id]
+        await interaction.response.send_message(
+            embed=f"You are still in an active Leetcode battle with <@{opponent_id}>.\nView the problem [here](https://leetcode.com/problems/{problem_slug}).",
+            ephemeral=True,
+        )
+        return
+
+    target_info = await db.get_info(target_user.id)
+    if not target_info:
+        await interaction.response.send_message(
+            embed=create_embed("This user does not have a Leetcode account linked!"),
+            ephemeral=True,
+        )
+        return
+
+    exp_time = int(time.time() + 120)
+    battle_request_cache[(interaction.user.id, target_user.id)] = True
+    embed = create_embed(
+        title="Battle Request",
+        message=f"<@{interaction.user.id}> has challenged you to a Leetcode Battle! (**{difficulty.capitalize()}**)"
+        + "\n\nIf you win, you rise a rank if your opponent is higher ranked.\nOtherwise, you gain tickets."
+        + "\nIf you lose, you fall down a rank (or lose LP)."
+        + "\nIf you are both Leetcode Champions, you gain or lose LP."
+        + f"\n\nThis request will expire <t:{exp_time}:R>.",
+    )
+
+    if target_info["rank"] == "Noob" or user_info["rank"] == "Noob":
+        embed.set_footer(
+            text="Since you or the requester is a Leetcode Noob, this battle won't have rewards or penalties."
+        )
+
+    await interaction.response.send_message(
+        f"<@{target_user.id}>",
+        embed=embed,
+        view=BattleRequest(
+            interaction.user.id,
+            target_user.id,
+            user_info,
+            target_info,
+            battle_request_cache,
+            battle_cache,
+            difficulty,
+        ),
+    )
+
+
+@bot.tree.command(
+    name="submit", description="Submit your accepted submission in a Leetcode battle."
+)
+@user_command(fetch_lc=False)
+async def submit(interaction: discord.Interaction):
+    if interaction.user.id not in battle_cache:
+        await interaction.response.send_message(
+            embed=create_embed("You are not in an active Leetcode battle!"),
+            ephemeral=True,
+        )
+        return
+
+    user_info, _ = interaction.data["injected"]
+    opponent_id, problem_slug, problem_difficulty, has_noob = battle_cache[
+        interaction.user.id
+    ]
+
+    await interaction.response.defer(thinking=True)
+
+    recent_ac = await lcapi.get_recent_ac(user_info["leetcode_handle"])
+    if not recent_ac:
+        await interaction.followup.send(
+            embed=create_embed("Your recent submission list is empty.")
+        )
+        return
+
+    latest_submission = recent_ac[0]
+    if latest_submission["titleSlug"] == problem_slug:
+
+        opponent_info = await db.get_info(opponent_id)
+
+        del battle_cache[interaction.user.id]
+        del battle_cache[opponent_id]
+
+        if not has_noob:
+            result_msg = await handle_battle_result(
+                user_info,
+                opponent_info,
+                problem_difficulty,
+                interaction.user.id,
+                opponent_id,
+            )
+        else:
+            result_msg = (
+                "Nothing happens because one of the users was a Leetcode **Noob**.\n"
+            )
+
+        await interaction.followup.send(
+            content=f"<@{interaction.user.id}> <@{opponent_id}>",
+            embed=create_embed(
+                title="Leetcode Battle",
+                message=f"<@{interaction.user.id}> won the Leetcode battle against <@{opponent_id}>!\n\n{result_msg}",
+            ),
+        )
+    else:
+        await interaction.followup.send(
+            embed=create_embed(
+                f"Your latest submission is not the battle problem.\nComplete the battle problem [here](https://leetcode.com/problems/{problem_slug})."
+            )
+        )
+
+
+@bot.tree.command(
+    name="cancel",
+    description="Send your opponent a request to cancel the Leetcode battle.",
+)
+@user_command(fetch_lc=False)
+async def cancel(interaction: discord.Interaction):
+    if not interaction.user.id in battle_cache:
+        await interaction.response.send_message(
+            embed=create_embed("You are not in a Leetcode battle!"), ephemeral=True
+        )
+        return
+
+    opponent_id, _, _, _ = battle_cache[interaction.user.id]
+    if (interaction.user.id, opponent_id) in battle_cancel_cache:
+        await interaction.response.send_message(
+            embed=create_embed(
+                "You already sent a cancel request. Please wait until it's responded to, or expires."
+            ),
+            ephemeral=True,
+        )
+        return
+    
+    battle_cancel_cache[(interaction.user.id, opponent_id)] = True
+    exp_time = int(time.time() + 60)
+    await interaction.response.send_message(
+        content=f"<@{opponent_id}>",
+        embed=create_embed(
+            f"<@{interaction.user.id}> has requested to cancel the Leetcode battle.\nThis request expires <t:{exp_time}:R>."
+        ),
+        view=BattleCancelRequest(interaction.user.id, opponent_id, battle_cache, battle_cancel_cache)
+    )
+
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print("Ready!")
 
 
+@bot.event
+async def on_close():
+    await bot.close()
+    exit()
+
+
 if __name__ == "__main__":
     asyncio.run(db.init())
-    with open("token", "r") as f:
+
+    token_file = "test_token" if os.environ.get("TEST_ACCOUNT") else "token"
+    with open(token_file, "r") as f:
         token = f.read()
     bot.run(token)

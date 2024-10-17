@@ -20,3 +20,17 @@ RANKUP_PROGRESSION = {
         "difficulty": "HARD",
     }
 }
+
+RANKDOWN_PROGRESSION = {
+    "Champion": "Master",
+    "Master": "Pro",
+    "Pro": "Noob",
+    "Noob": "Noob"
+}
+
+RANK_VALUE = {
+    "Noob": 1,
+    "Pro": 2,
+    "Master": 3,
+    "Champion": 4
+}
