@@ -83,6 +83,11 @@ class BattleRequest(discord.ui.View):
         if (self.id_a, self.id_b) in self.request_cache:
             del self.request_cache[(self.id_a, self.id_b)]
 
+        if self.id_a in self.battle_cache or self.id_b in self.battle_cache:
+            await interaction.response.send_message(embed=create_embed("One or more users are already in a battle."))
+            self.stop()
+            return
+        
         await interaction.response.defer(thinking=True)
         problem = await lcapi.get_random_problem(difficulty=self.difficulty.upper())
 
