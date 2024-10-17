@@ -12,7 +12,6 @@ class BattleCancelRequest(discord.ui.View):
         self.id_b = id_b
         self.battle_cache = battle_cache
         self.battle_cancel_cache = battle_cancel_cache
-        self.timeout = 60
         super().__init__(timeout=60)
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
@@ -80,7 +79,6 @@ class BattleRequest(discord.ui.View):
         self.request_cache = request_cache
         self.battle_cache = battle_cache
         self.difficulty = difficulty
-        self.timeout = 120
         super().__init__(timeout=120)
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
