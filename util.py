@@ -35,9 +35,13 @@ def create_profile_embed(info: dict, lc_info: dict, title: str, avatar):
         embed.add_field(name="Rank", value=info["rank"])
 
     embed.add_field(name="Tickets", value=info["tickets"])
+
     embed.add_field(name="Easies", value=lc_info["EASY"])
     embed.add_field(name="Mediums", value=lc_info["MEDIUM"])
     embed.add_field(name="Hards", value=lc_info["HARD"])
+
+    embed.add_field(name="Wins", value=info["wins"])
+    embed.add_field(name="Losses", value=info["losses"])
     embed.set_footer(
         text="Number of solved questions are not realtime - sync with /sync"
     )
@@ -109,6 +113,9 @@ async def handle_battle_result(
 ):
     result_msg = ""
     lp_delta = get_lp_delta(user_info, opponent_info, problem_difficulty)
+
+    await db.set_wins(user_id, user_info["wins"] + 1)
+    await db.set_losses(opponent_id, opponent_info["losses"] + 1)
 
     if opponent_info["rank"] == "Noob" or user_info["rank"] == "Noob":
         result_msg = "Nothing happens because someone is a Noob."

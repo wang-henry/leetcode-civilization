@@ -4,7 +4,7 @@ import random
 from typing import Literal, Union
 from cachetools import TTLCache
 import discord
-from consts import RANK_VALUE, RANKDOWN_PROGRESSION, RANKUP_PROGRESSION
+from consts import RANKUP_PROGRESSION
 import db
 from discord import app_commands
 from discord.ext import commands
@@ -455,7 +455,7 @@ async def cancel(interaction: discord.Interaction):
             ephemeral=True,
         )
         return
-    
+
     battle_cancel_cache[(interaction.user.id, opponent_id)] = True
     exp_time = int(time.time() + 60)
     await interaction.response.send_message(
@@ -463,8 +463,32 @@ async def cancel(interaction: discord.Interaction):
         embed=create_embed(
             f"<@{interaction.user.id}> has requested to cancel the Leetcode battle.\nThis request expires <t:{exp_time}:R>."
         ),
-        view=BattleCancelRequest(interaction.user.id, opponent_id, battle_cache, battle_cancel_cache)
+        view=BattleCancelRequest(
+            interaction.user.id, opponent_id, battle_cache, battle_cancel_cache
+        ),
     )
+
+
+@bot.tree.command(name="leaderboard", description="Flex your privilege.")
+@user_command(fetch_lc=False)
+async def leaderboard(interaction: discord.Interaction):
+    leaderboard_data, user_rank = await db.get_leaderboard(interaction.user.id)
+
+    formatted_leaderboard = []
+    for row in leaderboard_data:
+        rank_suffix = f"**{row["rank"]}**"
+        if row["rank"] == "Champion":
+            rank_suffix += f" ({row["champion_lp"]} LP)"
+
+        formatted_leaderboard.append(
+            f"**#{row["leaderboard_rank"]}** <@{row["discord_id"]}> {rank_suffix}"
+        )
+
+    embed: discord.Embed = create_embed(
+        title="Leaderboard", message="\n".join(formatted_leaderboard)
+    )
+    embed.set_footer(text=f"Your rank: {user_rank}")
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.event
