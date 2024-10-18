@@ -447,10 +447,13 @@ async def cancel(interaction: discord.Interaction):
         return
 
     opponent_id, _, _, _ = battle_cache[interaction.user.id]
-    if (interaction.user.id, opponent_id) in battle_cancel_cache:
+    if (interaction.user.id, opponent_id) in battle_cancel_cache or (
+        opponent_id,
+        interaction.user.id,
+    ) in battle_cancel_cache:
         await interaction.response.send_message(
             embed=create_embed(
-                "You already sent a cancel request. Please wait until it's responded to, or expires."
+                "There's already an active cancel request. Please wait until it's responded to, or expires."
             ),
             ephemeral=True,
         )
