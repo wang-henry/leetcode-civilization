@@ -475,7 +475,7 @@ async def cancel(interaction: discord.Interaction):
 @bot.tree.command(name="leaderboard", description="Flex your privilege.")
 @user_command(fetch_lc=False)
 async def leaderboard(interaction: discord.Interaction):
-    leaderboard_data, user_rank = await db.get_leaderboard(interaction.user.id)
+    leaderboard_data, user_rank, total_users = await db.get_leaderboard(interaction.user.id)
 
     formatted_leaderboard = []
     for row in leaderboard_data:
@@ -490,7 +490,7 @@ async def leaderboard(interaction: discord.Interaction):
     embed: discord.Embed = create_embed(
         title="Leaderboard", message="\n".join(formatted_leaderboard)
     )
-    embed.set_footer(text=f"Your rank: {user_rank}")
+    embed.set_footer(text=f"Your rank: {user_rank}/{total_users}")
     await interaction.response.send_message(embed=embed)
 
 

@@ -159,4 +159,4 @@ async def get_leaderboard(discord_id: int):
         if row[3] == discord_id:
             user_rank = i + 1
 
-    return formatted_rows[:10], user_rank
+    return formatted_rows[:10], user_rank, len(rows)
