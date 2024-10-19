@@ -163,3 +163,5 @@ cython_debug/
 *.db
 token
 test_token
+
+.idea/*
